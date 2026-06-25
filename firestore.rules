@@ -1,0 +1,76 @@
+rules_version = '2';
+
+// MVP rules: permissive — anyone signed-in (anonymous auth counts) can read
+// and write game data. We trust the client-side mutation logic to enforce
+// turn/ownership/word-count rules. For production this should be tightened
+// (likely via a Cloud Function or richer rules) — see TODO in mutations.ts.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function gameDoc(code) {
+      return get(/databases/$(database)/documents/games/$(code)).data;
+    }
+
+    function isStale(code) {
+      let g = gameDoc(code);
+      return g.lastActivityAt is timestamp &&
+        request.time.toMillis() - g.lastActivityAt.toMillis() > 30 * 60 * 1000;
+    }
+
+    match /games/{gameCode} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.hostId == request.auth.uid;
+      allow update: if isSignedIn();
+      // Host can delete anytime. Anyone can delete a game that's been
+      // inactive for 30+ minutes (cleanupStaleGame). The stale path
+      // checks resource.data directly because we can't call gameDoc()
+      // on the very doc being deleted without an extra round-trip.
+      allow delete: if isSignedIn() && (
+        resource.data.hostId == request.auth.uid ||
+        (resource.data.lastActivityAt is timestamp &&
+         request.time.toMillis() - resource.data.lastActivityAt.toMillis() > 30 * 60 * 1000)
+      );
+
+      match /players/{playerId} {
+        allow read: if isSignedIn();
+        // Each player owns their own doc.
+        allow create, update: if isSignedIn() && playerId == request.auth.uid;
+        // A player can remove themself (leaveLobby); the host can remove
+        // anyone (cancelGame batches the whole subcollection); anyone can
+        // clean up a stale game's players.
+        allow delete: if isSignedIn() && (
+          playerId == request.auth.uid ||
+          gameDoc(gameCode).hostId == request.auth.uid ||
+          isStale(gameCode)
+        );
+      }
+
+      match /stories/{storyId} {
+        allow read: if isSignedIn();
+        // MVP: any signed-in player in the game can write any story.
+        // Turn/ownership enforcement is client-side via transactions.
+        allow write: if isSignedIn();
+      }
+    }
+
+    // Player-submitted quips for the tip jar. Anyone signed in can drop one
+    // into the moderation queue; nothing is readable until a human flips
+    // `approved` to true in the Firestore console.
+    match /feedback/{id} {
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['text', 'name', 'submittedAt', 'approved'])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 100
+        && (request.resource.data.name == null ||
+            (request.resource.data.name is string &&
+             request.resource.data.name.size() <= 40))
+        && request.resource.data.approved == false;
+      allow read: if resource.data.approved == true;
+      allow update, delete: if false;
+    }
+  }
+}

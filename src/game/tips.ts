@@ -1,0 +1,16 @@
+export const TIPS: readonly string[] = [
+  "Seven is a game of silly short stories — written one turn at a time by everyone playing.",
+  "Each player adds exactly 7 words, then passes the story along. Nobody knows where it's going!",
+  "By the end, every story has been touched by every player. That's where the magic happens.",
+  "The rule: exactly 7 words per turn. Not 6, not 8. Count on your fingers if you need to!",
+  "You can use a period, question mark, or exclamation point — but you must write at least one word after it.",
+  "You'll write on a different story each turn. Don't worry — your own story comes back to you at the end.",
+  "Tip: a surprising location change can derail any story in the best possible way.",
+  "Tip: introduce a new character right when things get boring. Name them something ridiculous.",
+  "Tip: the weirder your 7 words, the harder the next person has to work. That's the fun.",
+  "Tip: read what came before carefully — the best contributions feel inevitable in hindsight.",
+  "Tip: don't try to be funny. Just be specific. Specific details are funnier than jokes.",
+  "Tip: if someone is taking a while, they're probably trying really hard. That's a good sign.",
+  "Tip: there are no wrong answers. The rules handle the structure — you handle the chaos.",
+  "Tip for the host: pick a theme if you want stories with a common thread, or skip it for pure mayhem.",
+];

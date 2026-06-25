@@ -1,0 +1,48 @@
+import { initializeApp, type FirebaseOptions } from "firebase/app";
+import {
+  getAuth,
+  signInAnonymously,
+  onAuthStateChanged,
+  type User,
+} from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+
+const firebaseConfig: FirebaseOptions = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+};
+
+export const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+
+let signInPromise: Promise<User> | null = null;
+
+export function ensureSignedIn(): Promise<User> {
+  if (auth.currentUser) return Promise.resolve(auth.currentUser);
+  if (signInPromise) return signInPromise;
+  signInPromise = new Promise<User>((resolve, reject) => {
+    const unsub = onAuthStateChanged(
+      auth,
+      (user) => {
+        if (user) {
+          unsub();
+          resolve(user);
+        }
+      },
+      (err) => {
+        unsub();
+        reject(err);
+      }
+    );
+    signInAnonymously(auth).catch((err) => {
+      unsub();
+      reject(err);
+    });
+  });
+  return signInPromise;
+}
