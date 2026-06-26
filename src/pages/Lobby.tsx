@@ -16,6 +16,7 @@ import { TipRotation } from "../components/TipRotation";
 import { TIPS } from "../game/tips";
 
 const MIN_PLAYERS = 3;
+const IS_DEV = import.meta.env.DEV;
 
 export function Lobby() {
   const { code } = useParams<{ code: string }>();
@@ -28,6 +29,9 @@ export function Lobby() {
   const [leaving, setLeaving] = useState(false);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [botCount, setBotCount] = useState(0);
+  const [spawningBots, setSpawningBots] = useState(false);
+  const [botError, setBotError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!game || !code) return;
@@ -134,6 +138,23 @@ export function Lobby() {
     }
   };
 
+  // Dev-only. Dynamically import the bot module so it never lands in
+  // production bundles even if the IS_DEV gate above were somehow bypassed.
+  const onSpawnBots = async () => {
+    if (!code || spawningBots) return;
+    setSpawningBots(true);
+    setBotError(null);
+    try {
+      const { spawnTestBots } = await import("../dev/spawnBot");
+      await spawnTestBots(code, 2);
+      setBotCount((c) => c + 2);
+    } catch (e) {
+      setBotError(e instanceof Error ? e.message : "Couldn't spawn bots.");
+    } finally {
+      setSpawningBots(false);
+    }
+  };
+
   const onLeaveGame = async () => {
     if (!code || leaving) return;
     setLeaving(true);
@@ -192,6 +213,32 @@ export function Lobby() {
         <p role="alert" className="text-rose-700 text-lg">
           {error}
         </p>
+      )}
+
+      {IS_DEV && isHost && (
+        <section className="border-2 border-dashed border-purple-400 rounded-xl p-3 flex flex-col gap-2">
+          <p className="text-purple-700 font-semibold text-sm">
+            [dev] Test bots
+          </p>
+          <p className="text-stone-600 text-sm">
+            {botCount === 0
+              ? "Spawn 2 bot players to play through alone."
+              : `${botCount} bot${botCount === 1 ? "" : "s"} active — they'll auto-write on their turns.`}
+          </p>
+          <button
+            type="button"
+            onClick={onSpawnBots}
+            disabled={spawningBots}
+            className="min-h-[48px] text-base font-medium bg-purple-100 text-purple-900 rounded-lg disabled:opacity-40"
+          >
+            {spawningBots ? "Spawning…" : "+ Add 2 test bots"}
+          </button>
+          {botError && (
+            <p role="alert" className="text-rose-700 text-sm">
+              {botError}
+            </p>
+          )}
+        </section>
       )}
 
       {isHost ? (
